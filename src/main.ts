@@ -1,9 +1,9 @@
 import { config } from 'dotenv'
 import { Anthropic } from "@anthropic-ai/sdk";
 import { createInterface } from 'node:readline/promises';
-import { makeClaudeAdapter } from './layers/access/claude.js';
-import type { Message, MessageType } from './layers/access/index.js';
-import { withTooling } from './layers/tooling/index.js';
+import { makeClaudeAdapter } from './claude.js';
+import type { Message, MessageType } from './access.js';
+import { withTooling } from './tooling.js';
 
 async function main() {
 	config()

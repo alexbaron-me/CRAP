@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { ProviderAdapter, Message, } from "../access/index.js";
+import type { ProviderAdapter, Message, } from "./access.js";
 import { assert } from "node:console";
 import { readdir, stat, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";

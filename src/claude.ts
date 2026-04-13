@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { MessageParam, MessageStreamParams } from "@anthropic-ai/sdk/resources";
-import { ProviderAdapter, Message, } from "./index.js";
+import { ProviderAdapter, Message, } from "./access.js";
 
 function denormalizeRequestMessage(message: Message): MessageParam {
 	if (message.type === "user" || message.type === "toolcall") {
