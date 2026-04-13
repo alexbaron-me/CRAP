@@ -10,10 +10,13 @@ importers:
     dependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.82.0
-        version: 0.82.0
+        version: 0.82.0(zod@4.3.6)
       dotenv:
         specifier: ^17.4.0
         version: 17.4.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@types/node':
         specifier: ^25.5.0
@@ -239,11 +242,16 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
-  '@anthropic-ai/sdk@0.82.0':
+  '@anthropic-ai/sdk@0.82.0(zod@4.3.6)':
     dependencies:
       json-schema-to-ts: 3.1.1
+    optionalDependencies:
+      zod: 4.3.6
 
   '@babel/runtime@7.29.2': {}
 
@@ -386,3 +394,5 @@ snapshots:
   typescript@5.9.3: {}
 
   undici-types@7.18.2: {}
+
+  zod@4.3.6: {}
