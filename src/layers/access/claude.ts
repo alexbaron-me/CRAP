@@ -3,7 +3,7 @@ import { MessageParam, MessageStreamParams } from "@anthropic-ai/sdk/resources";
 import { ProviderAdapter, RequestMessage, ResponseMessage } from "./index.js";
 
 function denormalizeRequestMessage(message: RequestMessage): MessageParam {
-	if (message.type === "user") {
+	if (message.type === "user" || message.type === "toolcall") {
 		return { role: "user", content: message.content }
 	}
 	if (message.type === "assistant") {
@@ -47,7 +47,7 @@ export function makeClaudeAdapter(): ProviderAdapter {
 
 			// TODO: Surface toolcalls etc.
 			const content = response.content.filter(block => block.type === "text").map(block => block.text).join("")
-			return { type: "message" as const, content }
+			return [{ type: "message" as const, content }]
 		}
 	}
 }

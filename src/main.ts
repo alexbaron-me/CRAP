@@ -2,7 +2,7 @@ import { config } from 'dotenv'
 import { Anthropic } from "@anthropic-ai/sdk";
 import { createInterface } from 'node:readline/promises';
 import { makeClaudeAdapter } from './layers/access/claude.js';
-import type { RequestMessage } from './layers/access/index.js';
+import type { RequestMessage, RequestMessageType } from './layers/access/index.js';
 import { withTooling } from './layers/tooling/index.js';
 
 async function main() {
@@ -21,9 +21,14 @@ async function main() {
 
 		history.push({ type: "user", content: message })
 		const response = await adapter.send(history)
-		history.push({ type: "assistant", content: response.content })
+		for (const part of response) {
+			const type: RequestMessageType = part.type === "message" ? "assistant" : (part.type === "toolcall" ? "toolcall" : "toolcall_result")
+			history.push({ type, content: part.content })
 
-		console.log(response.content)
+			if (type === "assistant")
+				console.log(part.content)
+		}
+
 	}
 }
 
