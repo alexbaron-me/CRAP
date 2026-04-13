@@ -1,22 +1,18 @@
 import { config } from 'dotenv'
 import { Anthropic } from "@anthropic-ai/sdk";
+import { makeClaudeAdapter } from './layers/access/claude.js';
 
 async function main() {
 	config()
 
-	const client = new Anthropic({
-		baseURL: "https://gateway.ai.itestra.com"
-	});
+	const adapter = makeClaudeAdapter()
+	const result = await adapter.send([
+		{ type: "user", content: "Hello, World!" }
+	])
 
-	const stream = await client.messages.stream({
-		max_tokens: 1024,
-		messages: [{ role: "user", content: "Hello there!" }],
-		model: "devstral-small-2",
-		stream: true
-	}).on("text", (text) => process.stdout.write(text));
-
-	const message = await stream.finalMessage();
-	console.log(`\n${message.usage.input_tokens} input tokens, ${message.usage.output_tokens} output tokens`);
+	for (const message of result) {
+		console.log(message.content)
+	}
 }
 
 main()
