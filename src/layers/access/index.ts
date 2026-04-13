@@ -1,4 +1,4 @@
-export type RequestMessageType = "system" | "user"
+export type RequestMessageType = "system" | "user" | "assistant"
 export type RequestMessage = {
 	type: RequestMessageType
 	content: string
@@ -11,5 +11,5 @@ export type ResponseMessage = {
 }
 
 export type ProviderAdapter = {
-	send: (messages: RequestMessage[]) => Promise<ResponseMessage[]>;
+	send: (messages: RequestMessage[]) => Promise<ResponseMessage>;
 }
