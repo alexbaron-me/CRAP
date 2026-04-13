@@ -1,7 +1,7 @@
 import { z } from "zod"
 import type { ProviderAdapter, RequestMessage } from "../access/index.js";
 import { assert } from "node:console";
-import { readdir, stat } from "node:fs/promises";
+import { readdir, stat, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 export type Tool = {
@@ -49,8 +49,40 @@ const lsTool: Tool = {
 		}
 	}
 }
+const readFileTool: Tool = {
+	id: "read_file",
+	description: "Reads the content of a file given its path",
+	inputSchema: z.object({
+		path: z.string()
+	}),
+	outputSchema: z.object({
+		content: z.string()
+	}),
+	handler: async param => {
+		const { path } = param as { path: string }
+		return {
+			content: await readFile(path, "utf-8")
+		}
+	}
+}
+const writeFileTool: Tool = {
+	id: "write_file",
+	description: "Writes content to a file at a given path. If the file already exists, it will be overwritten.",
+	inputSchema: z.object({
+		path: z.string(),
+		content: z.string()
+	}),
+	outputSchema: z.object({
+		success: z.boolean()
+	}),
+	handler: async param => {
+		const { path, content } = param as { path: string, content: string }
+		await writeFile(path, content, "utf-8")
+		return { success: true }
+	}
+}
 
-const tools: Tool[] = [pongTool, lsTool]
+const tools: Tool[] = [pongTool, lsTool, readFileTool, writeFileTool]
 const toolInfo = tools.map(t => `id=${t.id}: description=${t.description}`).join("; ")
 
 const toolCallSchema = z.object({
