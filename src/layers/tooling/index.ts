@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { ProviderAdapter, RequestMessage } from "../access/index.js";
+import type { ProviderAdapter, Message, } from "../access/index.js";
 import { assert } from "node:console";
 import { readdir, stat, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -90,55 +90,51 @@ const toolCallSchema = z.object({
 	input: z.record(z.string(), z.unknown())
 })
 
+async function call(adapter: ProviderAdapter, messages: Message[]): Promise<Message> {
+	const responses = await adapter.send(messages)
+	assert(responses.length === 1)
+	const response = responses[0]
+
+	return response
+}
+function isToolCall(message: Message): boolean {
+	return message.type === "assistant" &&
+		message.content.startsWith("<toolcall>") &&
+		message.content.endsWith("</toolcall>")
+}
+
 export function withTooling(baseAdapter: ProviderAdapter): ProviderAdapter {
 	return {
 		...baseAdapter,
 		send: async (sourceMessages) => {
-			const messages: RequestMessage[] = [
-				{ type: "system", content: "You have access to the following tools: " + toolInfo + ' You can call a tool by sending a message of the following pattern: `<toolcall>{"id": TOOL_ID, "input": JSON_INPUT}</toolcall>`. Do not add any additional text, your entire response must not contain anything but the toolcall. You will receive a JSON response wrapped in `<toolcall_result>` indicating success or failure, containing the tool call result or error message.' }, // TODO: Include tools
+			const bootstrapMessages: Message[] = [
+				{ type: "system", content: "You have access to the following tools: " + toolInfo + '.\nYou can call a tool by sending a message of the following pattern: `<toolcall>{"id": TOOL_ID, "input": JSON_INPUT}</toolcall>`. Do not add any additional text, your entire response must not contain anything but the toolcall. Ensure your message starts with exactly `<toolcall>`, and ends exactly with `</toolcall>`. You will receive a JSON response wrapped in `<toolcall_result>` indicating success or failure, containing the tool call result or error message.' }, // TODO: Include tools
 				...sourceMessages]
 
-			const responses = await baseAdapter.send(messages)
-			assert(responses.length === 1)
-			const response = responses[0]
+			let conversationMessages: Message[] = []
+			let response = await call(baseAdapter, bootstrapMessages)
+			while (isToolCall(response)) {
+				conversationMessages.push({ type: "assistant", content: response.content })
 
-			if (response.type === "message" &&
-				(!response.content.startsWith("<toolcall>") || !response.content.endsWith("</toolcall>")))
-				return [response]
+				const toolcallContent = response.content.slice("<toolcall>".length, -"</toolcall>".length)
+				const parseResult = toolCallSchema.safeParse(JSON.parse(toolcallContent))
+				if (!parseResult.success) throw new Error(`Received invalid toolcall: ${parseResult.error.message}`)
 
-			const toolcallContent = response.content.slice("<toolcall>".length, -"</toolcall>".length)
-			const parseResult = toolCallSchema.safeParse(JSON.parse(toolcallContent))
-			if (!parseResult.success) throw new Error(`Received invalid toolcall: ${parseResult.error.message}`)
+				const tool = tools.find(t => t.id === parseResult.data.id)
+				if (!tool) throw new Error(`Received toolcall for unknown tool ${parseResult.data.id}`)
+				const input = tool.inputSchema.safeParse(parseResult.data.input)
+				if (!input.success) throw new Error(`Received invalid toolcall parameters for tool '${tool.id}': ${input.error.message}`)
 
-			const tool = tools.find(t => t.id === parseResult.data.id)
-			if (!tool) throw new Error(`Received toolcall for unknown tool ${parseResult.data.id}`)
-			const input = tool.inputSchema.safeParse(parseResult.data.input)
-			if (!input.success) throw new Error(`Received invalid toolcall parameters for tool '${tool.id}': ${input.error.message}`)
+				console.log(`\tReceived toolcall for id=${tool.id} with parameters=${JSON.stringify(input.data)}`)
+				const result = await tool.handler(input.data)
+				console.log(`\tTool responed with response=${JSON.stringify(result)}`)
 
-			console.log(`\tReceived toolcall for id=${tool.id} with parameters=${JSON.stringify(input.data)}`)
-			const result = await tool.handler(input.data)
-			console.log(`\tTool responed with response=${JSON.stringify(result)}`)
-			// TODO: Send errors to LLM
-			// TODO: Handle followup toolcalls
+				conversationMessages.push({ type: "toolcall_result", content: `<toolcall_result>${JSON.stringify(result)}</toolcall_result>` })
 
-			const followupResponse = await baseAdapter.send([...messages,
-			{
-				type: "assistant",
-				content: response.content
-			}, {
-				type: "toolcall",
-				content: `<toolcall_result>${JSON.stringify(result)}</toolcall_result>`
-			}])
-			assert(followupResponse.length === 1)
-
-			return [{
-				type: "toolcall",
-				content: response.content
-			}, {
-				type: "toolcall_result",
-				content: `<toolcall_result>${JSON.stringify(result)}</toolcall_result>`
-			}, { type: "message", content: followupResponse[0].content }
-			];
+				response = await call(baseAdapter, [...bootstrapMessages, ...conversationMessages])
+			}
+			conversationMessages.push({ type: "assistant", content: response.content })
+			return conversationMessages
 		}
 	}
 }
