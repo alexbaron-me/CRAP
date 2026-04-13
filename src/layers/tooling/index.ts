@@ -1,6 +1,8 @@
 import { z } from "zod"
 import type { ProviderAdapter, RequestMessage } from "../access/index.js";
 import { assert } from "node:console";
+import { readdir, stat } from "node:fs/promises";
+import { resolve } from "node:path";
 
 export type Tool = {
 	id: string
@@ -21,8 +23,34 @@ const pongTool: Tool = {
 	}),
 	handler: () => Promise.resolve({ response: "pong" })
 }
+const lsTool: Tool = {
+	id: "ls",
+	description: "Lists all files in a folder, defaulting to the current work directory if no path is given",
+	inputSchema: z.object({
+		path: z.string().optional()
+	}),
+	outputSchema: z.object({
+		path: z.string(),
+		items: z.array(z.object({
+			name: z.string(),
+			type: z.union([z.literal("file"), z.literal("folder")])
+		}))
+	}),
+	handler: async param => { // TODO: Fix imprecise typing
+		const { path = "." } = param as { path?: string }
 
-const tools: Tool[] = [pongTool]
+		const dirents = await readdir(path)
+		return {
+			path: resolve(path),
+			items: await Promise.all(dirents.map(async name => ({
+				name,
+				type: await stat(resolve(path, name)).then(stats => stats.isDirectory() ? "folder" : "file").catch(() => "file") // TODO: Handle errors properly
+			})))
+		}
+	}
+}
+
+const tools: Tool[] = [pongTool, lsTool]
 const toolInfo = tools.map(t => `id=${t.id}: description=${t.description}`).join("; ")
 
 const toolCallSchema = z.object({
@@ -35,7 +63,7 @@ export function withTooling(baseAdapter: ProviderAdapter): ProviderAdapter {
 		...baseAdapter,
 		send: async (sourceMessages) => {
 			const messages: RequestMessage[] = [
-				{ type: "system", content: "You have access to the following tools: " + toolInfo + ' You can call a tool by sending a message of the following pattern: `<toolcall>{"id": TOOL_ID, "input": JSON_INPUT}</toolcall>`. You will receive a JSON response wrapped in `<toolcall_result>` indicating success or failure, containing the tool call result or error message.' }, // TODO: Include tools
+				{ type: "system", content: "You have access to the following tools: " + toolInfo + ' You can call a tool by sending a message of the following pattern: `<toolcall>{"id": TOOL_ID, "input": JSON_INPUT}</toolcall>`. Do not add any additional text, your entire response must not contain anything but the toolcall. You will receive a JSON response wrapped in `<toolcall_result>` indicating success or failure, containing the tool call result or error message.' }, // TODO: Include tools
 				...sourceMessages]
 
 			const responses = await baseAdapter.send(messages)

@@ -6,7 +6,7 @@ function denormalizeRequestMessage(message: RequestMessage): MessageParam {
 	if (message.type === "user" || message.type === "toolcall") {
 		return { role: "user", content: message.content }
 	}
-	if (message.type === "assistant") {
+	if (message.type === "assistant" || message.type === "toolcall_result") {
 		return { role: "assistant", content: message.content }
 	}
 
